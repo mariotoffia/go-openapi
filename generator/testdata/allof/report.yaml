@@ -1,0 +1,31 @@
+Report:
+  type: object
+  description: >
+    This is a multi-line comment.
+    And can be preserved.
+  properties:
+    type:
+      type: string
+      description: This is the discriminator for what type of _Report_ this is. Use the `ReportType`.
+      example: "UsageReport"
+      maxLength: 32
+      minLength: 1
+    version:
+      type: string
+      description: The semver v2 version of the report.
+      example: "1.0.0"
+      maxLength: 32
+      minLength: 5
+  required:
+    - type
+    - version
+
+ReportType:
+  type: string
+  description: The report instance type.
+  enum:
+    - UsageReport
+    - ImportDataPointReport
+    - ExportDataPointReport
+    - DataPointThresholdReport
+    - MissingDataPointReport

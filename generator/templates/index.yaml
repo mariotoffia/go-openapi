@@ -1,0 +1,26 @@
+openapi: "3.0.1"
+info:
+  title: go open api generator
+  version: 1.0.0
+  description: Generates go models from open api specifications 
+  termsOfService: "https://github.com/mariotoffia/go-openapi/blob/main/LICENSE"
+  contact:
+    name: mario.toffia@xyz.se
+  license:
+    name: Apache 2.0
+paths:
+  /info:
+    get:
+      operationId: getInfo
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PackageInfo"
+components:
+  schemas:
+    PackageInfo:
+      description: Just to make all happy clappy...
+      type: string

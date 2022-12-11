@@ -1,0 +1,98 @@
+UsageReport:
+# Inherit from Report
+  allOf:
+    - $ref: "../allof/report.yaml#/Report"
+    - $ref: "#/UsageReportBody"
+
+UsageReportBody:
+  type: object
+  description: This report describes a usage on the _CEOS_ platform.
+  properties:
+    api:
+      $ref: "#/APIUsage"
+    compute:
+      $ref: "#/ComputeUsage"
+
+ComputeUsage:
+  type: object
+  description: This describes a single compute usage
+  properties:
+    computeType: 
+      $ref: "#/ComputeType"
+    details:
+      type: string
+      description: >
+        The details of the compute e.g. if ec2 - which type of instance it is (e.g. t2.micro) 
+        or if lambda e.g. x86 or arm.
+      example: "arm"
+    usage:
+      $ref: "#/Usage"
+      example:
+        - name: compute
+          value: 87
+  required:
+    - computeType
+    - usage
+          
+APIUsage:
+  type: object
+  description: This describes a single API usage such as "aws::dynamo::PutItem" or "https://api.example.com/v1/thing"
+  properties:
+    callURI:
+      type: string
+      format: uri
+      description: The Api call, e.g. a http call or a uri such "aws::iot::UpdateDeviceShadow".
+      x-codegen-name: api
+    usage:
+      $ref: "#/Usage"
+  examples:
+    - name: read-unit
+      value: 10
+    - name: write-unit
+      value: 2
+    - name: call
+      value: 2
+    - name: payload-size
+      value: 100
+  required:
+    - callURI
+    - usage
+
+Usage:
+  description: Describes one or more usages that can be attributed to e.g. API or Lambda execution.
+  type: array
+  items:
+    $ref: "#/UsageType"
+
+UsageType:
+  type: object
+  description: This contains the name of the usage and the value is a number. It may be a time or a item count.
+  properties:
+    name:
+      $ref: "#/UsageTypes"
+    value:
+      type: number
+      description: The value of the usage, e.g. 10 (kB for payload-size) or 1 (ms for compute)
+  required:
+    - name
+    - value
+
+ComputeType:
+  type: string
+  example: "lambda"
+  enum:
+    - lambda
+    - ec2
+    - ecs
+    - fargate
+  x-codegen-name: compute
+
+UsageTypes:
+  type: string
+  description: The name of the usage to determine the impact e.g. cost of the usage. 
+  enum:
+    - read-unit
+    - write-unit
+    - call
+    - compute
+    - payload-size

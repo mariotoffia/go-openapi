@@ -1,0 +1,7 @@
+ChooseReporter:
+# Inherit from Report
+  oneOf:
+    - $ref: "../allof/import-report.yaml#/ImportReport"
+    - $ref: "./usage-report.yaml#/UsageReport"
+  discriminator:
+    propertyName: type

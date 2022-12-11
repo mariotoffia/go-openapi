@@ -1,0 +1,14 @@
+ImportReport:
+# Inherit from Report
+  allOf:
+    - $ref: "./report.yaml#/Report"
+    - $ref: "#/ImportReportBody"
+
+ImportReportBody:
+  type: object
+  description: Inherits `Report` and adds a imported property
+  properties:
+    imported:
+      type: string
+      description: Dummy
+      example: "dummy"
