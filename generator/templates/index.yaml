@@ -22,5 +22,5 @@ paths:
 components:
   schemas:
     PackageInfo:
-      description: Just to make all happy clappy...
+      description: __go-openapi-gen:remove
       type: string

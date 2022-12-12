@@ -36,6 +36,100 @@ func NewGenerator(settings Settings) *Generator {
 }
 
 func (gen *Generator) Generate() error {
+	tempSpecFile, err := gen.prepareSpecificationFile()
+
+	// Remove temp spec file
+	defer func() {
+		if tempSpecFile != "" {
+			os.Remove(tempSpecFile)
+		}
+	}()
+
+	// This is after the defer, so that the temp file is removed
+	// in any case.
+	if err != nil {
+		return err
+	}
+
+	// Load the specification
+	doc, err := gen.settings.loader.LoadFromFile(gen.settings.spec)
+
+	if err != nil {
+		return err
+	}
+
+	err = doc.Validate(gen.settings.loader.Context)
+	if err != nil {
+		return err
+	}
+
+	var buffer bytes.Buffer
+	DumpSchemas(&buffer, doc.Components.Schemas)
+
+	fmt.Println(buffer.String())
+
+	return nil
+}
+
+func DumpSchemas(buffer *bytes.Buffer, schemas map[string]*openapi3.SchemaRef) {
+	for k, v := range schemas {
+
+		if k == "PackageInfo" &&
+			v.Value != nil &&
+			v.Value.Description == "__go-openapi-gen:remove" {
+			// Skip dummy
+			continue
+		}
+
+		fmt.Fprintln(buffer, "schema: ", k)
+		DumpSchemaRef(buffer, v)
+	}
+}
+func DumpValue(buffer *bytes.Buffer, v *openapi3.Schema) {
+	if v == nil {
+		fmt.Println("nil")
+		return
+	}
+
+	data, _ := v.MarshalJSON()
+	fmt.Fprintln(buffer, string(data))
+}
+
+func DumpSchemaRef(buffer *bytes.Buffer, v *openapi3.SchemaRef) {
+
+	if v.Ref != "" {
+		fmt.Fprintln(buffer, "ref: ", v.Ref)
+	}
+	DumpSchemaRefs(buffer, v.Value.AllOf)
+	DumpSchemaRefs(buffer, v.Value.AnyOf)
+	DumpSchemaRefs(buffer, v.Value.OneOf)
+	DumpValue(buffer, v.Value)
+}
+
+func DumpSchemaRefs(buffer *bytes.Buffer, refs openapi3.SchemaRefs) {
+	if len(refs) == 0 {
+		return
+	}
+
+	for _, v := range refs {
+		if v.Value.Discriminator != nil && len(v.Value.Discriminator.Mapping) > 0 {
+			fmt.Fprintln(buffer, "discriminator: ", v.Value.Discriminator.PropertyName)
+			for k, v := range v.Value.Discriminator.Mapping {
+				fmt.Fprintln(buffer, "mapping: ", k, " -> ", v)
+			}
+		}
+
+		DumpSchemaRef(buffer, v)
+	}
+}
+
+// prepareSpecificationFile will ensure that a spec file exist.
+//
+// If none has been provided by user, a temporary one will be created.
+//
+// Then all scanned modules (if any inclusion in settings) are added to
+// the spec file to make sure that all models are included.
+func (gen *Generator) prepareSpecificationFile() (string, error) {
 	var tempSpecFile string
 
 	// Add models to spec
@@ -43,7 +137,7 @@ func (gen *Generator) Generate() error {
 		// Scan for modules
 		modules, err := ScanForModules(gen.settings.models, gen.settings.inclusion)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		var m map[string]any
@@ -56,26 +150,26 @@ func (gen *Generator) Generate() error {
 			// Get default index.yaml
 			index, err := gen.settings.templates.GetFileAsString(string(TemplateIndex))
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			// Write index.yaml
 			if err = os.WriteFile(tempSpecFile, []byte(index), 0644); err != nil {
-				return err
+				return "", err
 			}
 
 			if err := yaml.Unmarshal([]byte(index), &m); err != nil {
-				return err
+				return "", err
 			}
 		} else {
 			// User set a existing spec -> use it
 			data, err := os.ReadFile(gen.settings.spec)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			if err := yaml.Unmarshal(data, &m); err != nil {
-				return err
+				return "", err
 			}
 		}
 
@@ -101,81 +195,14 @@ func (gen *Generator) Generate() error {
 			// Write spec
 			data, err := yaml.Marshal(m)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			if err = os.WriteFile(gen.settings.spec, data, 0644); err != nil {
-				return err
+				return "", err
 			}
 		}
 	}
 
-	// Remove temp spec file
-	defer func() {
-		if tempSpecFile != "" {
-			os.Remove(tempSpecFile)
-		}
-	}()
-
-	// Load the specification
-	doc, err := gen.settings.loader.LoadFromFile(gen.settings.spec)
-
-	if err != nil {
-		return err
-	}
-
-	err = doc.Validate(gen.settings.loader.Context)
-	if err != nil {
-		return err
-	}
-
-	var buffer bytes.Buffer
-	DumpSchemas(&buffer, doc.Components.Schemas)
-
-	fmt.Println(buffer.String())
-
-	return nil
-}
-
-func DumpSchemas(buffer *bytes.Buffer, schemas map[string]*openapi3.SchemaRef) {
-	for k, v := range schemas {
-		fmt.Fprintln(buffer, "schema: ", k)
-		DumpSchemaRef(buffer, v)
-	}
-}
-func DumpValue(buffer *bytes.Buffer, v *openapi3.Schema) {
-	if v == nil {
-		fmt.Println("nil")
-		return
-	}
-
-	data, _ := v.MarshalJSON()
-	fmt.Fprintln(buffer, string(data))
-}
-
-func DumpSchemaRef(buffer *bytes.Buffer, v *openapi3.SchemaRef) {
-	if v.Ref != "" {
-		fmt.Fprintln(buffer, "ref: ", v.Ref)
-	}
-	DumpSchemaRefs(buffer, v.Value.AllOf)
-	DumpSchemaRefs(buffer, v.Value.AnyOf)
-	DumpSchemaRefs(buffer, v.Value.OneOf)
-	DumpValue(buffer, v.Value)
-}
-
-func DumpSchemaRefs(buffer *bytes.Buffer, refs openapi3.SchemaRefs) {
-	if len(refs) == 0 {
-		return
-	}
-
-	for _, v := range refs {
-		if v.Value.Discriminator != nil && len(v.Value.Discriminator.Mapping) > 0 {
-			fmt.Fprintln(buffer, "discriminator: ", v.Value.Discriminator.PropertyName)
-			for k, v := range v.Value.Discriminator.Mapping {
-				fmt.Fprintln(buffer, "mapping: ", k, " -> ", v)
-			}
-		}
-
-		DumpSchemaRef(buffer, v)
-	}
+	return tempSpecFile, nil
 }

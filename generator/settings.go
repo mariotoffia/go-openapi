@@ -11,12 +11,14 @@ type Include struct {
 	Glob string
 }
 type Settings struct {
-	loader    *openapi3.Loader
-	models    string
-	output    string
-	spec      string
-	inclusion []Include
-	templates Templates
+	loader        *openapi3.Loader
+	model_package string
+	models        string
+	output        string
+	spec_package  string
+	spec          string
+	inclusion     []Include
+	templates     Templates
 }
 
 func NewSettings(templates Templates) *Settings {
@@ -32,8 +34,12 @@ func (sett *Settings) ToGenerator() *Generator {
 
 // UseModelPath sets the base path where all models are resolved
 // relative to.
-func (sett *Settings) UseModelPath(models string) *Settings {
+//
+// The _model_package_ is the full package name to the _models_ path.
+// For example "models", "github.com/mariotoffia/go-openapi/models".
+func (sett *Settings) UseModelPath(models, model_package string) *Settings {
 	sett.models = models
+	sett.model_package = model_package
 	return sett
 }
 
@@ -49,8 +55,12 @@ func (sett *Settings) UseOutputPath(output string) *Settings {
 //
 // NOTE: If model scanning is performed, those will be added to
 // the spec _components.schema_ section.
-func (sett *Settings) UseSpec(spec string) *Settings {
+//
+// The _spec_package_ is the full package name to the _spec_ path.
+// For example "spec", "github.com/mariotoffia/go-openapi/spec".
+func (sett *Settings) UseSpec(spec, spec_package string) *Settings {
 	sett.spec = spec
+	sett.spec_package = spec_package
 	return sett
 }
 
