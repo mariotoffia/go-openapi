@@ -1,12 +1,9 @@
 package generator_test
 
 import (
-	"fmt"
-	"path/filepath"
 	"testing"
 
 	"github.com/mariotoffia/go-openapi/generator"
-	"github.com/mariotoffia/go-openapi/generator/gentypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,13 +20,6 @@ func TestSimpleAllOf(t *testing.T) {
 		UseOutputPath("_output").
 		ToGenerator()
 
-	err := gen.Generate()
+	err := gen.Generate(generator.GeneratorContext{})
 	assert.Equal(t, nil, err)
-}
-
-func TestResolvePath(t *testing.T) {
-	root := gentypes.GoModFqPath()
-	path := "../anyof"
-
-	fmt.Println(filepath.Join(root, path))
 }

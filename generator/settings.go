@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -35,9 +37,16 @@ func (sett *Settings) ToGenerator() *Generator {
 // UseModelPath sets the base path where all models are resolved
 // relative to.
 //
+// CAUTION: It must be a fully qualified path, and not a relative path.
+//
 // The _model_package_ is the full package name to the _models_ path.
 // For example "models", "github.com/mariotoffia/go-openapi/models".
 func (sett *Settings) UseModelPath(models, model_package string) *Settings {
+
+	if !filepath.IsAbs(models) {
+		panic(fmt.Sprintf("models path must be absolute, not relative: %s", models))
+	}
+
 	sett.models = models
 	sett.model_package = model_package
 	return sett
@@ -51,6 +60,8 @@ func (sett *Settings) UseOutputPath(output string) *Settings {
 
 // UseSpec sets the path where a open api spec file is located.
 //
+// CAUTION: It must be a fully qualified path, and not a relative path.
+//
 // If none is provided, a default one will be created.
 //
 // NOTE: If model scanning is performed, those will be added to
@@ -59,6 +70,11 @@ func (sett *Settings) UseOutputPath(output string) *Settings {
 // The _spec_package_ is the full package name to the _spec_ path.
 // For example "spec", "github.com/mariotoffia/go-openapi/spec".
 func (sett *Settings) UseSpec(spec, spec_package string) *Settings {
+
+	if !filepath.IsAbs(spec) {
+		panic(fmt.Sprintf("spec path must be absolute, not relative: %s", spec))
+	}
+
 	sett.spec = spec
 	sett.spec_package = spec_package
 	return sett

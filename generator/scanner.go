@@ -10,12 +10,16 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Module struct {
+// OpenAPIModule represents a file with one or more
+// openapi objects.
+type OpenAPIModule struct {
 	Path    string
 	Objects []string
 }
 
-func (m Module) ToRef(object string) string {
+// ToRef creates a reference to the object in or outside
+// of the module.
+func (m OpenAPIModule) ToRef(object string) string {
 	return fmt.Sprintf("%s#/%s", m.Path, object)
 }
 
@@ -24,8 +28,8 @@ func (m Module) ToRef(object string) string {
 //
 // Open the file and parse it using the yaml parser. Include all
 // top level object into a `Module` object.
-func ScanForModules(path string, inclusion []Include) ([]Module, error) {
-	modules := []Module{}
+func ScanForModules(path string, inclusion []Include) ([]OpenAPIModule, error) {
+	modules := []OpenAPIModule{}
 
 	f := os.DirFS(path)
 	for _, inc := range inclusion {
@@ -37,7 +41,7 @@ func ScanForModules(path string, inclusion []Include) ([]Module, error) {
 			inc.Glob,
 			func(f fs.FS, path string) error {
 				// Create a new module
-				module := Module{
+				module := OpenAPIModule{
 					Path:    path,
 					Objects: []string{},
 				}

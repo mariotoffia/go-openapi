@@ -2,7 +2,16 @@ ImportReport:
 # Inherit from Report
   allOf:
     - $ref: "./report.yaml#/Report"
-    - $ref: "#/ImportReportBody"
+    - type: object
+      $ref: "#/ImportReportBody"
+      description: "any overrides will be ignored - it will just take the $ref!"
+    - type: object
+      description: "This will be inlined into the ImportReport"
+      properties:
+        imported:
+          type: string
+          description: Dummy
+          example: "dummy"
 
 ImportReportBody:
   type: object

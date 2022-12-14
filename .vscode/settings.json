@@ -6,10 +6,12 @@
     "getkin",
     "gobwas",
     "gurka",
+    "iancoleman",
     "mariotoffia",
     "mypkg",
     "nisse",
     "openapi",
+    "strcase",
     "stretchr",
     "testdata"
   ]
