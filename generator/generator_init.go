@@ -32,6 +32,7 @@ func prepareSpecificationFile(ctx *GeneratorContext) (string, error) {
 		if ctx.settings.spec == "" {
 			tempSpecFile = path.Join(ctx.settings.model_root, "__go-openapi.yaml")
 			ctx.settings.spec = tempSpecFile
+			ctx.settings.spec_root = ctx.settings.model_root
 
 			// Get default index.yaml
 			index, err := ctx.settings.templates.GetFileAsString(string(TemplateIndex))

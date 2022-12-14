@@ -18,6 +18,7 @@ type Settings struct {
 	model_root    string
 	output        string
 	spec_package  string
+	spec_root     string
 	spec          string
 	inclusion     []Include
 	templates     Templates
@@ -75,7 +76,12 @@ func (sett *Settings) UseSpec(spec, spec_package string) *Settings {
 		panic(fmt.Sprintf("spec path must be absolute, not relative: %s", spec))
 	}
 
+	if !strings.HasSuffix(spec, ".yaml") && !strings.HasSuffix(spec, ".json") {
+		panic(fmt.Sprintf("spec path must be a yaml or json file: %s", spec))
+	}
+
 	sett.spec = spec
+	sett.spec_root = filepath.Dir(spec)
 	sett.spec_package = spec_package
 	return sett
 }

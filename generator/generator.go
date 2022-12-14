@@ -93,8 +93,9 @@ func ProcessSpecification(ctx *GeneratorContext, schemas map[string]*openapi3.Sc
 		}
 
 		id := gentypes.FromRefString(
-			fmt.Sprintf("%s#/components/schemas/%s", filepath.Base(ctx.settings.spec), componentName),
-			filepath.Dir(ctx.settings.spec),
+			fmt.Sprintf(
+				"%s#/components/schemas/%s",
+				filepath.Base(ctx.settings.spec), componentName), ctx.settings.spec_root,
 		)
 
 		comp, err := CreateComponent(ctx, id, v)
@@ -174,7 +175,7 @@ func ResolveReferenceAndSwitchIfNeeded(
 	if IsSpecificationRooted(ctx, ref_path) {
 		if IsSpecificationRef(ctx, componentId) {
 			// Specification rooted component id -> no switch
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec)
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec_root)
 		} else {
 			// Switch root to module root
 			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
@@ -185,7 +186,7 @@ func ResolveReferenceAndSwitchIfNeeded(
 			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
 		} else {
 			// Switch root to spec root
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec)
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec_root)
 		}
 	}
 
@@ -208,13 +209,13 @@ func IsSpecificationRef(ctx *GeneratorContext, ref *gentypes.ComponentReference)
 func IsSpecificationRooted(ctx *GeneratorContext, path string) bool {
 
 	if strings.HasPrefix(path, ctx.settings.model_root) {
-		if strings.HasPrefix(path, ctx.settings.spec) {
+		if strings.HasPrefix(path, ctx.settings.spec_root) {
 			// Both are rooted - if longest is spec then it is spec rooted
-			return len(ctx.settings.spec) > len(ctx.settings.model_root)
+			return len(ctx.settings.spec_root) > len(ctx.settings.model_root)
 		}
 
 		return false
 	}
 
-	return strings.HasPrefix(path, ctx.settings.spec)
+	return strings.HasPrefix(path, ctx.settings.spec_root)
 }
