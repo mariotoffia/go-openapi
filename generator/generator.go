@@ -2,10 +2,10 @@ package generator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mariotoffia/go-openapi/generator/gentypes"
@@ -93,7 +93,7 @@ func ProcessSpecification(ctx *GeneratorContext, schemas map[string]*openapi3.Sc
 		}
 
 		id := gentypes.FromRefString(
-			fmt.Sprintf("%s#/components/schemas/%s", ctx.settings.spec, componentName),
+			fmt.Sprintf("%s#/components/schemas/%s", filepath.Base(ctx.settings.spec), componentName),
 			filepath.Dir(ctx.settings.spec),
 		)
 
@@ -127,179 +127,94 @@ func CreateComponent(ctx *GeneratorContext, componentId *gentypes.ComponentRefer
 	}
 
 	if ref.Ref == "" {
-		// This is a inline type, we need to create it.
+		// This is a inline type
 		td := gentypes.TypeDefinition{
 			ID:          component.ID,
-			GoPackage:   component.ID.ToGoPackage(ctx.settings.spec_package),
+			GoPackage:   ResolveGoPackage(ctx, &component.ID),
 			Schema:      ref.Value,
 			Composition: []gentypes.Composition{},
 			Properties:  []gentypes.Property{},
 		}
 
 		component.Definition = &td
-	} else {
-		// This is a reference, we need to resolve it.
-		type_ref := gentypes.FromComponentRefAndSchemaRef(&component.ID, ref)
-		cached_type := ctx.resolver.ResolveComponent(type_ref)
-
-		if cached_type != nil {
-			return nil, nil
-		}
-
-	}
-
-	config := gentypes.CreateConfig{
-		RootPath:       ctx.settings.models,
-		GoRootPackage:  ctx.settings.model_package,
-		Name:           componentName,
-		GoFileStrategy: gentypes.GoFileStrategyOnePerType,
-	}
-
-	if ref.Ref != "" {
-		type_ref := gentypes.FromSchemaRef(ref, ctx.settings.models)
-		cached_type := ctx.resolver.ResolveReference(type_ref.String())
-
-		if cached_type != nil {
-			// Already cached
-			// TODO: If override types (then we need to create a new type) - need to upgrade kin-openapi to handle that
-			return &gentypes.ComponentDefinition{
-				Reference: type_ref,
-			}, nil
-		}
-
-	}
-
-	// Create type and initialize it.
-	td, err := gentypes.CreateType(ref, config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Register the final type
-	ctx.resolver.RegisterType(td, ctx.settings.models)
-
-	var registerComponent, returnComponent *gentypes.ComponentDefinition
-	if ref.Ref != "" {
-		// Return the reference
-		returnComponent = &gentypes.ComponentDefinition{
-			Reference: gentypes.FromSchemaRef(ref, ctx.settings.models),
-		}
-
-		// TODO: If override types (then we need to create a new type) - need to upgrade kin-openapi to handle that
-		registerComponent = &gentypes.ComponentDefinition{
-			Definition: td,
-		}
 
 	} else {
-		// Type Definition (not a reference)
-		registerComponent = &gentypes.ComponentDefinition{
-			Definition: td,
+		// This is a reference
+		component.Reference = ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, ref)
+		cached_type := ctx.resolver.ResolveComponent(component.Reference)
+
+		if cached_type != nil {
+			return component, nil
 		}
-
-		returnComponent = registerComponent
-	}
-
-	ctx.resolver.RegisterComponent(registerComponent, path)
-	// Now that we have registered it, we may safely continue resolving
-	// the type.
-
-	// TODO: Handle Properties
-	for propertyName := range ref.Value.Properties {
-		prop := ref.Value.Properties[propertyName]
-		ref := prop.Ref
-
-		if ref == "" {
-			ref = propertyName
-		}
-
-		CreateComponent(ctx, "componentName", filepath.Join(path, ref), prop)
 
 	}
 
-	// TODO: Handle Composites (allOf)
+	// TODO: If component contains definition -> Chase down properties, allOf, ...
+	// TODO: If component contains reference -> create type and put that into new component
+	// TODO: If the ref component.TypeName != component.ID.TypeName -> create a additional
+	// new type by shallow copy the ref component and change the type name.
 
-	// TODO: Handle oneOf and anyOf
-
-	return returnComponent, nil
+	return component, nil
 }
 
-// HandleSpecRef is called for each component found in the specification
-// and not in a separate module file.
-func HandleComponentSpecRef(ctx *GeneratorContext, componentName string, v *openapi3.SchemaRef) error {
-
-	config := gentypes.CreateConfig{
-		RootPath:       ctx.settings.models,
-		GoRootPackage:  ctx.settings.model_package,
-		Name:           componentName,
-		GoFileStrategy: gentypes.GoFileStrategyOnePerType,
-	}
-
-	td, err := gentypes.CreateType(v, config)
-
-	if err != nil {
-		panic(err)
-	}
-
-	// Composite
-	if len(v.Value.AllOf) > 0 {
-		composites, schema, err := HandleComposite(config, td, v.Value.AllOf)
-		if err != nil {
-			return err
-		}
-
-		// Composite Properties
-		for i := range composites {
-			fmt.Println(i)
-			/*
-				properties, err := HandleProperties(ctx, config, &composites[i].TypeDefinition)
-				if err != nil {
-					return err
-				}
-
-				composites[i].Properties = properties
-			*/
-		}
-
-		td.Composition = composites
-		td.Schema = schema
-
-	}
-
-	// Properties
-	properties, err := HandleProperties(ctx, config, td)
-	if err != nil {
-		return err
-	}
-
-	td.Properties = properties
-
-	// TODO: Handle oneOf, anyOf, not(???)
-
-	// TODO: Add to resolver so we don't create types twice
-
-	data, _ := json.Marshal(td)
-	fmt.Println(string(data))
-	return nil
-}
-
-func HandleProperties(
+// ResolveReferenceAndSwitchIfNeeded will create a `ComponentReference`. If the _ref_ is under the specification root path
+// then it will be used. If it is under model root path it will use that instead to create the `ComponentReference`
+// as root path. If specification and module is on the same root path, the the longest path will be used as root path.
+func ResolveReferenceAndSwitchIfNeeded(
 	ctx *GeneratorContext,
-	config gentypes.CreateConfig,
-	td *gentypes.TypeDefinition) (properties []gentypes.Property, err error) {
+	componentId *gentypes.ComponentReference,
+	ref *openapi3.SchemaRef,
+) *gentypes.ComponentReference {
+	// Create the fully qualified path to the reference
+	ref_path := filepath.Join(componentId.RootPath, componentId.Path, ref.Ref)
+	ref_path = filepath.Clean(ref_path)
 
-	if len(td.Schema.Properties) == 0 {
-		return
+	var type_ref *gentypes.ComponentReference
+
+	if IsSpecificationRooted(ctx, ref_path) {
+		if IsSpecificationRef(ctx, componentId) {
+			// Specification rooted component id -> no switch
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec)
+		} else {
+			// Switch root to module root
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
+		}
+	} else {
+		if !IsSpecificationRef(ctx, componentId) {
+			// Module rooted component id -> no switch
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
+		} else {
+			// Switch root to spec root
+			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec)
+		}
 	}
 
-	for k := range td.Schema.Properties {
-		cfg := config
-		property, err := gentypes.CreateProperty(td.Schema.Properties[k], k, cfg)
-		if err != nil {
-			return nil, err
+	return type_ref
+}
+
+func ResolveGoPackage(ctx *GeneratorContext, ref *gentypes.ComponentReference) string {
+
+	if IsSpecificationRef(ctx, ref) {
+		return ref.ToGoPackage(ctx.settings.spec_package)
+	}
+
+	return ref.ToGoPackage(ctx.settings.model_package)
+}
+
+func IsSpecificationRef(ctx *GeneratorContext, ref *gentypes.ComponentReference) bool {
+	return IsSpecificationRooted(ctx, ref.RootPath)
+}
+
+func IsSpecificationRooted(ctx *GeneratorContext, path string) bool {
+
+	if strings.HasPrefix(path, ctx.settings.model_root) {
+		if strings.HasPrefix(path, ctx.settings.spec) {
+			// Both are rooted - if longest is spec then it is spec rooted
+			return len(ctx.settings.spec) > len(ctx.settings.model_root)
 		}
 
-		properties = append(properties, *property)
+		return false
 	}
 
-	return
+	return strings.HasPrefix(path, ctx.settings.spec)
 }

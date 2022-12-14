@@ -237,8 +237,8 @@ func MergeSchemaRef(ctx *GeneratorContext, to *openapi3.SchemaRef, from *openapi
 		return nil, nil
 	}
 
-	to_ref := gentypes.FromSchemaRef(to, ctx.settings.models)
-	from_ref := gentypes.FromSchemaRef(from, ctx.settings.models)
+	to_ref := gentypes.FromSchemaRef(to, ctx.settings.model_root)
+	from_ref := gentypes.FromSchemaRef(from, ctx.settings.model_root)
 	if to_ref.Equal(from_ref) {
 		return to, nil
 	}

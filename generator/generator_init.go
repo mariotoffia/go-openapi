@@ -21,7 +21,7 @@ func prepareSpecificationFile(ctx *GeneratorContext) (string, error) {
 	// Add models to spec
 	if len(ctx.settings.inclusion) > 0 {
 		// Scan for modules
-		modules, err := ScanForModules(ctx.settings.models, ctx.settings.inclusion)
+		modules, err := ScanForModules(ctx.settings.model_root, ctx.settings.inclusion)
 		if err != nil {
 			return "", err
 		}
@@ -30,7 +30,7 @@ func prepareSpecificationFile(ctx *GeneratorContext) (string, error) {
 
 		// No specification provided, create a temporary one
 		if ctx.settings.spec == "" {
-			tempSpecFile = path.Join(ctx.settings.models, "__go-openapi.yaml")
+			tempSpecFile = path.Join(ctx.settings.model_root, "__go-openapi.yaml")
 			ctx.settings.spec = tempSpecFile
 
 			// Get default index.yaml
@@ -71,7 +71,7 @@ func prepareSpecificationFile(ctx *GeneratorContext) (string, error) {
 				for _, object := range module.Objects {
 					if _, ok := schemas[object]; !ok {
 						schemas[object] = map[string]interface{}{
-							"$ref": gentypes.FromRefString(module.ToRef(object), ctx.settings.models).ToOpenAPI(),
+							"$ref": gentypes.FromRefString(module.ToRef(object), ctx.settings.model_root).ToOpenAPI("yaml"),
 							"type": "object",
 						}
 					}

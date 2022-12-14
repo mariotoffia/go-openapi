@@ -17,7 +17,7 @@ type ComponentReference struct {
 	// will have a namespace of _components/schemas_ and the
 	// Type will be _MyType_.
 	NameSpace string
-	// Module is the filename of the file
+	// Module is the filename of the file excluding the extension.
 	Module string
 	// Path returns the relative path from the _rootPath_
 	Path string
@@ -69,7 +69,7 @@ func NewComponentReference(typeName, module, path, rootPath string) *ComponentRe
 	return &ComponentReference{
 		TypeName:  strings.Trim(typeName, " "),
 		NameSpace: TrimPath(namespace),
-		Module:    TrimPath(module),
+		Module:    TrimPath(RemoveExtensionOnFile(module)),
 		Path:      TrimPath(strings.TrimPrefix(fq, rootPath)),
 		RootPath:  strings.TrimSuffix(rootPath, "/ "),
 	}
@@ -93,9 +93,12 @@ func (tr *ComponentReference) String() string {
 }
 
 // ToOpenAPI creates a open api specification compatible reference.
-func (tr *ComponentReference) ToOpenAPI() string {
+func (tr *ComponentReference) ToOpenAPI(ext string) string {
+
 	return fmt.Sprintf(
-		"%s/%s#/%s.yaml", tr.Path, tr.Module, filepath.Join(tr.NameSpace, tr.TypeName),
+		"%s.%s#/%s", filepath.Join(tr.Path, tr.Module),
+		strings.TrimPrefix(ext, "."),
+		filepath.Join(tr.NameSpace, tr.TypeName),
 	)
 }
 
@@ -129,6 +132,10 @@ func (tr *ComponentReference) ToRelativeFilePath(ext string) string {
 		tr.Path,
 		fmt.Sprintf("%s.%s", tr.Module, strings.TrimPrefix(ext, ".")),
 	)
+}
+
+func (tr *ComponentReference) IsOnRootPath(rootPath string) bool {
+	return tr.RootPath == rootPath
 }
 
 func (tr *ComponentReference) Equal(other *ComponentReference) bool {
@@ -176,23 +183,6 @@ func FromSchemaRef(ref *openapi3.SchemaRef, rootPath string) *ComponentReference
 	}
 
 	return FromRefString(ref.Ref, rootPath)
-}
-
-func FromComponentRefAndSchemaRef(cr *ComponentReference, ref *openapi3.SchemaRef) *ComponentReference {
-	if cr == nil {
-		panic("cr is nil")
-	}
-
-	if ref == nil || ref.Ref == "" {
-		panic("ref is nil or empty")
-	}
-
-	// Internal component ref?
-	if strings.HasPrefix(TrimPath(ref.Ref), "#/") {
-		return FromRefString(cr.ToRelativeFilePath("yaml")+ref.Ref, cr.RootPath)
-	}
-
-	return FromRefString(ref.Ref, cr.RootPath)
 }
 
 // FromTypeDefinition will render a reference to _td_ type

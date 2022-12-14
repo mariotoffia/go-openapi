@@ -15,7 +15,7 @@ type Include struct {
 type Settings struct {
 	loader        *openapi3.Loader
 	model_package string
-	models        string
+	model_root    string
 	output        string
 	spec_package  string
 	spec          string
@@ -47,7 +47,7 @@ func (sett *Settings) UseModelPath(models, model_package string) *Settings {
 		panic(fmt.Sprintf("models path must be absolute, not relative: %s", models))
 	}
 
-	sett.models = models
+	sett.model_root = models
 	sett.model_package = model_package
 	return sett
 }
