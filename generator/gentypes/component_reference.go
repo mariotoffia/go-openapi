@@ -75,6 +75,16 @@ func NewComponentReference(typeName, module, path, rootPath string) *ComponentRe
 	}
 }
 
+func (tr *ComponentReference) NewWithChangedTypeName(newTypeName string) *ComponentReference {
+	return &ComponentReference{
+		TypeName:  newTypeName,
+		NameSpace: tr.NameSpace,
+		Module:    tr.Module,
+		Path:      tr.Path,
+		RootPath:  tr.RootPath,
+	}
+}
+
 // HasType is set to `true` when the Type is set.
 // IsEmpty returns `true` if the reference is empty.
 func (tr *ComponentReference) IsEmpty() bool {

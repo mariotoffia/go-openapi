@@ -1,6 +1,8 @@
 package generator_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,6 +25,13 @@ func TestSimpleAllOf(t *testing.T) {
 		UseOutputPath("_output").
 		ToGenerator()
 
-	err := gen.Generate(generator.GeneratorContext{})
+	ctx := generator.GeneratorContext{}
+	err := gen.Generate(&ctx)
 	assert.Equal(t, nil, err)
+
+	if data, err := json.Marshal(ctx.GetSpecification()); err != nil {
+		t.Error(err)
+	} else {
+		fmt.Println(string(data))
+	}
 }

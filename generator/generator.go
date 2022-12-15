@@ -17,6 +17,11 @@ type GeneratorContext struct {
 	resolver      gentypes.ReferenceResolverImpl
 	specification gentypes.OpenAPISpecificationDefinition
 }
+
+func (ctx *GeneratorContext) GetSpecification() *gentypes.OpenAPISpecificationDefinition {
+	return &ctx.specification
+}
+
 type Generator struct {
 	// settings is only used to clone into `GeneratorContext`
 	settings Settings
@@ -41,7 +46,7 @@ func NewGenerator(settings Settings) *Generator {
 	return gen
 }
 
-func (gen *Generator) Generate(ctx GeneratorContext) error {
+func (gen *Generator) Generate(ctx *GeneratorContext) error {
 	ctx.settings = gen.settings
 	ctx.resolver = *gentypes.NewReferenceResolver()
 
@@ -49,7 +54,7 @@ func (gen *Generator) Generate(ctx GeneratorContext) error {
 		Components: map[string]*gentypes.ComponentDefinition{},
 	}
 
-	tempSpecFile, err := prepareSpecificationFile(&ctx)
+	tempSpecFile, err := prepareSpecificationFile(ctx)
 
 	// Remove temp spec file
 	defer func() {
@@ -76,7 +81,7 @@ func (gen *Generator) Generate(ctx GeneratorContext) error {
 		return err
 	}
 
-	ProcessSpecification(&ctx, doc.Components.Schemas)
+	ProcessSpecification(ctx, doc.Components.Schemas)
 
 	return nil
 }
@@ -173,65 +178,28 @@ func CreateComponentFromDefinition(
 	ctx.resolver.RegisterComponent(component)
 
 	// Composition
-	if len(def.AllOf) > 0 {
-
-		// Extract *all* inline objects first
-		var err error
-
-		for {
-
-			inline_objects := openapi3.SchemaRefs{}
-
-			for i := range def.AllOf {
-				compose_type := def.AllOf[i]
-
-				if compose_type.Ref == "" {
-					inline_objects = append(inline_objects, compose_type)
-					continue
-				}
-			}
-
-			if len(inline_objects) == 0 {
-				break
-			}
-
-			// Remove all inline objects in td.Schema.AllOf
-			for i := range inline_objects {
-				td.Schema.AllOf = RemoveSchemaRef(td.Schema.AllOf, inline_objects[i])
-			}
-
-			// Merge the inline objects into the main schema.
-			for i := range inline_objects {
-				c := inline_objects[i]
-				if td.Schema, err = MergeSchemaObjects(ctx, td.Schema, c.Value); err != nil {
-					return nil, err
-				}
-			}
-
-		}
-
-		// Handle all references (all inline objects have been removed)
-		for i := range def.AllOf {
-			compose_type := def.AllOf[i]
-			// Reference to other type.
-			ref := ctx.resolver.ResolveComponent(componentId)
-			if ref == nil {
-				if ref, err = CreateComponentFromReference(ctx, componentId, compose_type); err != nil {
-					return nil, err
-				}
-			}
-
-			td.Composition = append(td.Composition, gentypes.Composition{
-				ComponentDefinition: *ref,
-				Inline:              false,
-			})
-		}
-
+	if err := HandleComposition(ctx, &td, component, def); err != nil {
+		return nil, err
 	}
 
-	// TODO: Chase down properties, allOf, ...
+	// Handle Reference Properties
+	if err := HandleProperties(ctx, &td, component, def); err != nil {
+		return nil, err
+	}
+
+	// TODO: Chase down anyOf, oneOf
 
 	return component, nil
+}
+
+// Contains will check if a string is in a slice of strings.
+func Contains(slice []string, value string) bool {
+	for _, item := range slice {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveSchemaRef will remove a _ref_ from the _references_ slice if found.
