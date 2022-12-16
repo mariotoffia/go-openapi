@@ -25,17 +25,25 @@ func HandleProperties(
 		}
 
 		// Reference to other type.
-		ref := ctx.resolver.ResolveComponent(&component.ID)
-		if ref == nil {
-			if ref, err = CreateComponentFromReference(ctx, &component.ID, property); err != nil {
+		property_id := component.ID.NewWithChangedTypeName(
+			component.ID.TypeName + "_" + strcase.ToCamel(propertyName),
+		)
+
+		ref := ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, property)
+
+		if ctx.resolver.ResolveComponent(&component.ID) != nil {
+			if _, err = CreateComponentFromReference(ctx, ref, property); err != nil {
 				return err
 			}
 		}
 
 		td.Properties = append(td.Properties, gentypes.Property{
-			ComponentDefinition: *ref,
-			Required:            Contains(def.Required, propertyName),
-			PropertyName:        propertyName,
+			ComponentDefinition: gentypes.ComponentDefinition{
+				ID:        *property_id,
+				Reference: ref,
+			},
+			Required:     Contains(def.Required, propertyName),
+			PropertyName: propertyName,
 		})
 	}
 

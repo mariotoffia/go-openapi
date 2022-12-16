@@ -22,6 +22,29 @@ func (ctx *GeneratorContext) GetSpecification() *gentypes.OpenAPISpecificationDe
 	return &ctx.specification
 }
 
+func (ctx *GeneratorContext) GetResolver() *gentypes.ReferenceResolverImpl {
+	return &ctx.resolver
+}
+
+func (ctx *GeneratorContext) ResolveTypeDefinition(ref *gentypes.ComponentReference) *gentypes.TypeDefinition {
+	for {
+		component := ctx.resolver.ResolveComponent(ref)
+		if component == nil {
+			return nil
+		}
+
+		if component.Definition != nil {
+			return component.Definition
+		}
+
+		if component.Reference == nil {
+			return nil
+		}
+
+		ref = component.Reference
+	}
+}
+
 type Generator struct {
 	// settings is only used to clone into `GeneratorContext`
 	settings Settings

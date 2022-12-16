@@ -53,17 +53,20 @@ func HandleComposition(
 	// Handle all references (all inline objects have been removed)
 	for i := range def.AllOf {
 		compose_type := def.AllOf[i]
+		compose_type_id := ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, compose_type)
 		// Reference to other type.
-		ref := ctx.resolver.ResolveComponent(&component.ID)
-		if ref == nil {
-			if ref, err = CreateComponentFromReference(ctx, &component.ID, compose_type); err != nil {
+		if ctx.resolver.ResolveComponent(compose_type_id) == nil {
+			if _, err = CreateComponentFromReference(ctx, compose_type_id, compose_type); err != nil {
 				return err
 			}
 		}
 
 		td.Composition = append(td.Composition, gentypes.Composition{
-			ComponentDefinition: *ref,
-			Inline:              false,
+			ComponentDefinition: gentypes.ComponentDefinition{
+				ID:        *compose_type_id.NewWithChangedTypeName(compose_type_id.TypeName + "_Composition"),
+				Reference: compose_type_id,
+			},
+			Inline: false,
 		})
 	}
 

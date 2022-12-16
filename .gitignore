@@ -16,3 +16,5 @@
 
 # Skip output directories
 _output/
+
+tempdata/

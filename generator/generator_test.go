@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mariotoffia/go-openapi/generator"
+	"github.com/mariotoffia/go-openapi/generator/gentypes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,9 +30,27 @@ func TestSimpleAllOf(t *testing.T) {
 	err := gen.Generate(&ctx)
 	assert.Equal(t, nil, err)
 
-	if data, err := json.Marshal(ctx.GetSpecification()); err != nil {
-		t.Error(err)
-	} else {
-		fmt.Println(string(data))
+	spec := ctx.GetSpecification()
+
+	m := map[string]gentypes.TypeDefinition{}
+
+	for k, v := range spec.Components {
+		if v.Definition != nil {
+			m[k] = *v.Definition
+		}
+
+		if v.Reference != nil {
+			component := ctx.ResolveTypeDefinition(v.Reference)
+			if component != nil {
+				m[k] = *component
+			}
+		}
 	}
+
+	data, err := json.Marshal(m)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fmt.Println(string(data))
 }
