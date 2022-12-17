@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/iancoleman/strcase"
 )
 
 // ComponentReference is a reference to a `ComponentDefinition`.
@@ -75,9 +76,9 @@ func NewComponentReference(typeName, module, path, rootPath string) *ComponentRe
 	}
 }
 
-func (tr *ComponentReference) NewWithChangedTypeName(newTypeName string) *ComponentReference {
+func (tr *ComponentReference) NewWithAppendTypeName(typeNameToAppend string) *ComponentReference {
 	return &ComponentReference{
-		TypeName:  newTypeName,
+		TypeName:  tr.TypeName + "_" + strcase.ToCamel(typeNameToAppend),
 		NameSpace: tr.NameSpace,
 		Module:    tr.Module,
 		Path:      tr.Path,

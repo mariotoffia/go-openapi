@@ -2,45 +2,116 @@ package generator
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/iancoleman/strcase"
-	"github.com/mariotoffia/go-openapi/generator/gentypes"
 )
 
 // AddSchemaToObject will add a schema to an object schema.
-func AddSchemaToObject(to *openapi3.Schema, from *openapi3.SchemaRef, required bool) error {
+type ExtendConfig struct {
+	// MergeDocs is set to `true` it will add documentation onto each other (if _extending_ contains description).
+	MergeDocs bool
+	// MergeEnum indicates wether a enum should be replaced or merge with _target_.
+	//
+	// NOTE: It will use the equality Operator to determine if elements are equal or not.
+	MergeEnum bool
+	// MergeExtensions will stipulate if the extending schema will completely overwrite or merge its
+	// extensions onto target schema.
+	MergeExtensions bool
+}
 
-	if to.Type != "object" {
-		return fmt.Errorf("cannot add schema to non-object schema")
+// ExtendSchema will extend the _target_ schema with the _extending_ and the _target_ schema is returned.
+//
+// CAUTION: This will not take into account that the _extending_ schema type is not set. If set, it will make
+// sure that it matches the _target_ schema type.
+//
+// Extend Support:
+//
+// * Description
+// * ExternalDocs
+// * Example
+// * Enum
+// * Extensions
+// * Default
+// * Pattern (note it will not affect the `openapi3.Schema.compiledPattern` !!!)
+func ExtendSchema(
+	ctx *GeneratorContext,
+	target openapi3.Schema,
+	extending *openapi3.Schema, config *ExtendConfig) (*openapi3.Schema, error) {
+
+	if target.Type == "" {
+		return nil, fmt.Errorf("target schema type is not set")
 	}
 
-	if from.Value.Type == "object" {
-		return fmt.Errorf("cannot add object schema to object schema")
+	if extending.Type != "" && (extending.Type != target.Type) {
+		return nil, fmt.Errorf("when extending schema has a type, it must conform to target type")
 	}
 
-	if to.Properties == nil {
-		to.Properties = openapi3.Schemas{
-			from.Value.Title: from,
+	if config == nil {
+		config = &ExtendConfig{
+			MergeDocs: false,
 		}
-	} else {
-		if _, ok := to.Properties[from.Value.Title]; ok {
-			return fmt.Errorf("cannot add schema to object schema, already exists")
-		}
-
-		to.Properties[from.Value.Title] = from
 	}
 
-	if required {
-
-		if to.Required == nil {
-			to.Required = []string{}
+	if len(extending.Description) > 0 {
+		if config.MergeDocs {
+			target.Description = MergeStrings(target.Description, extending.Description)
+		} else {
+			target.Description = extending.Description
 		}
 	}
 
-	return nil
+	if extending.Example != nil {
+		target.Example = extending.Example
+	}
+
+	if len(extending.Enum) > 0 {
+		if config.MergeEnum && len(target.Enum) > 0 {
+
+			var add []any
+			for i := range extending.Enum {
+				if !ContainsInterface(target.Enum, extending.Enum[i]) {
+					add = append(add, extending.Enum[i])
+				}
+			}
+
+			if len(add) > 0 {
+				target.Enum = append(target.Enum, add...)
+			}
+
+		} else {
+			target.Enum = extending.Enum
+		}
+	}
+
+	if len(extending.Extensions) > 0 {
+		if config.MergeExtensions {
+
+			if target.Extensions == nil {
+				target.Extensions = map[string]any{}
+			}
+
+			for k := range extending.Extensions {
+				target.Extensions[k] = extending.Extensions[k]
+			}
+
+		} else {
+			target.Extensions = extending.Extensions
+		}
+	}
+
+	if extending.Default != nil {
+		target.Default = extending.Default
+	}
+
+	if extending.ExternalDocs != nil {
+		target.ExternalDocs = extending.ExternalDocs
+	}
+
+	if len(extending.Pattern) > 0 {
+		target.Pattern = extending.Pattern
+	}
+
+	return &target, nil
 }
 
 // MergeSchemaObjects will merge two schema of type object into one schema.
@@ -55,24 +126,34 @@ func MergeSchemaObjects(ctx *GeneratorContext, to *openapi3.Schema, from *openap
 	}
 
 	if len(from.OneOf) > 0 {
-		merged.OneOf = append(merged.OneOf, from.OneOf...)
+		for i := range from.OneOf {
+			if !ContainsSchemaRef(to.OneOf, from.OneOf[i]) {
+				merged.OneOf = append(merged.OneOf, from.OneOf[i])
+			}
+		}
 	}
 
 	if len(from.AllOf) > 0 {
-		merged.AllOf = append(merged.AllOf, from.AllOf...)
+		for i := range from.AllOf {
+			if !ContainsSchemaRef(to.AllOf, from.AllOf[i]) {
+				merged.AllOf = append(merged.AllOf, from.AllOf[i])
+			}
+		}
 	}
 
 	if len(from.AnyOf) > 0 {
-		merged.AnyOf = append(merged.AnyOf, from.AnyOf...)
+		for i := range from.AnyOf {
+			if !ContainsSchemaRef(to.AnyOf, from.AnyOf[i]) {
+				merged.AnyOf = append(merged.AnyOf, from.AnyOf[i])
+			}
+		}
 	}
 
 	if from.Not != nil {
-		m, err := MergeSchemaRef(ctx, merged.Not, from.Not)
-		if err != nil {
-			return nil, err
+		if merged.Not == nil {
+			// Premiere the to Not and drop the from Not
+			merged.Not = from.Not
 		}
-
-		merged.Not = m
 	}
 
 	merged.Title = MergeStrings(to.Title, from.Title)
@@ -181,7 +262,17 @@ func MergeSchemaObjects(ctx *GeneratorContext, to *openapi3.Schema, from *openap
 		merged.Discriminator = from.Discriminator
 	}
 
-	merged.Required = append(merged.Required, from.Required...)
+	if len(from.Required) > 0 {
+		if len(merged.Required) > 0 {
+			for i := range from.Required {
+				if !ContainsString(merged.Required, from.Required[i]) {
+					merged.Required = append(merged.Required, from.Required[i])
+				}
+			}
+		} else {
+			merged.Required = from.Required
+		}
+	}
 
 	if len(from.Properties) > 0 {
 		if len(to.Properties) == 0 {
@@ -190,16 +281,8 @@ func MergeSchemaObjects(ctx *GeneratorContext, to *openapi3.Schema, from *openap
 
 			for k := range from.Properties {
 
-				if _, ok := to.Properties[k]; ok {
-					m, err := MergeSchemaRef(ctx, to.Properties[k], from.Properties[k])
-
-					if err != nil {
-						return nil, err
-					}
-
-					merged.Properties[k] = m
-
-				} else {
+				if _, ok := to.Properties[k]; !ok {
+					// Premiere the to property and drop from property
 					merged.Properties[k] = from.Properties[k]
 				}
 			}
@@ -208,64 +291,4 @@ func MergeSchemaObjects(ctx *GeneratorContext, to *openapi3.Schema, from *openap
 
 	return &merged, nil
 
-}
-
-func MergeStrings(to, from string) string {
-
-	if to == "" {
-		return from
-	}
-
-	if from == "" {
-		return to
-	}
-
-	return fmt.Sprintf("%s\n\n%s", to, from)
-
-}
-func MergeSchemaRef(ctx *GeneratorContext, to *openapi3.SchemaRef, from *openapi3.SchemaRef) (*openapi3.SchemaRef, error) {
-
-	if from == nil && to != nil {
-		return to, nil
-	}
-
-	if to == nil && from != nil {
-		return from, nil
-	}
-
-	if to == nil && from == nil {
-		return nil, nil
-	}
-
-	to_ref := gentypes.FromSchemaRef(to, ctx.settings.model_root)
-	from_ref := gentypes.FromSchemaRef(from, ctx.settings.model_root)
-	if to_ref.Equal(from_ref) {
-		return to, nil
-	}
-
-	to_file := to_ref.Module
-	if to_ref.Module != from_ref.Module {
-		to_file = filepath.Join(RemoveExtensionOnFile(from_ref.Module), to_ref.Module)
-	}
-
-	to_component := to_ref.TypeName
-	if to_component != from_ref.TypeName {
-		to_component = strcase.ToCamel(to_ref.TypeName + to_component)
-	}
-
-	merge, err := MergeSchemaObjects(ctx, to.Value, from.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	return &openapi3.SchemaRef{
-		Ref:   fmt.Sprintf("%s#/%s", to_file, to_component),
-		Value: merge,
-	}, nil
-
-}
-
-func RemoveExtensionOnFile(filename string) string {
-	ext := filepath.Ext(filename)
-	return strings.TrimSuffix(filename, ext)
 }

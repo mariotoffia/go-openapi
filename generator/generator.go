@@ -215,8 +215,8 @@ func CreateComponentFromDefinition(
 	return component, nil
 }
 
-// Contains will check if a string is in a slice of strings.
-func Contains(slice []string, value string) bool {
+// ContainsString will check if a string is in a slice of strings.
+func ContainsString(slice []string, value string) bool {
 	for _, item := range slice {
 		if item == value {
 			return true

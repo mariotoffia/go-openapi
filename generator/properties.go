@@ -2,7 +2,6 @@ package generator
 
 import (
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/iancoleman/strcase"
 	"github.com/mariotoffia/go-openapi/generator/gentypes"
 )
 
@@ -25,9 +24,7 @@ func HandleProperties(
 		}
 
 		// Reference to other type.
-		property_id := component.ID.NewWithChangedTypeName(
-			component.ID.TypeName + "_" + strcase.ToCamel(propertyName),
-		)
+		property_id := component.ID.NewWithAppendTypeName(propertyName)
 
 		ref := ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, property)
 
@@ -42,7 +39,7 @@ func HandleProperties(
 				ID:        *property_id,
 				Reference: ref,
 			},
-			Required:     Contains(def.Required, propertyName),
+			Required:     ContainsString(def.Required, propertyName),
 			PropertyName: propertyName,
 		})
 	}
@@ -51,9 +48,7 @@ func HandleProperties(
 	for propertyName := range property_objects {
 		property := property_objects[propertyName]
 
-		property_id := component.ID.NewWithChangedTypeName(
-			component.ID.TypeName + "_" + strcase.ToCamel(propertyName),
-		)
+		property_id := component.ID.NewWithAppendTypeName(propertyName)
 
 		if property.Value.Type == "object" {
 			// Create a new component for the property
@@ -64,7 +59,7 @@ func HandleProperties(
 
 			td.Properties = append(td.Properties, gentypes.Property{
 				ComponentDefinition: *ref,
-				Required:            Contains(def.Required, propertyName),
+				Required:            ContainsString(def.Required, propertyName),
 				PropertyName:        propertyName,
 			})
 
@@ -84,7 +79,7 @@ func HandleProperties(
 						Properties:  []gentypes.Property{},
 					},
 				},
-				Required:     Contains(def.Required, propertyName),
+				Required:     ContainsString(def.Required, propertyName),
 				PropertyName: propertyName,
 			})
 
@@ -95,9 +90,7 @@ func HandleProperties(
 		}
 
 		// Array
-		property_array_id := property_id.NewWithChangedTypeName(
-			property_id.TypeName + "_" + strcase.ToCamel(propertyName) + "Array",
-		)
+		property_array_id := property_id.NewWithAppendTypeName("Array")
 
 		// Array is ref
 		if property.Value.Items.Ref != "" {
@@ -108,7 +101,7 @@ func HandleProperties(
 
 			td.Properties = append(td.Properties, gentypes.Property{
 				ComponentDefinition: *ref,
-				Required:            Contains(def.Required, propertyName),
+				Required:            ContainsString(def.Required, propertyName),
 				PropertyName:        propertyName,
 			})
 
@@ -124,7 +117,7 @@ func HandleProperties(
 
 			td.Properties = append(td.Properties, gentypes.Property{
 				ComponentDefinition: *ref,
-				Required:            Contains(def.Required, propertyName),
+				Required:            ContainsString(def.Required, propertyName),
 				PropertyName:        propertyName,
 			})
 
@@ -139,7 +132,7 @@ func HandleProperties(
 
 		td.Properties = append(td.Properties, gentypes.Property{
 			ComponentDefinition: *ref, // TODO: This should be a new component with a ref instead?
-			Required:            Contains(def.Required, propertyName),
+			Required:            ContainsString(def.Required, propertyName),
 			PropertyName:        propertyName,
 		})
 	}

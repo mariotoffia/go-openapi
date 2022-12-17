@@ -63,7 +63,7 @@ func HandleComposition(
 
 		td.Composition = append(td.Composition, gentypes.Composition{
 			ComponentDefinition: gentypes.ComponentDefinition{
-				ID:        *compose_type_id.NewWithChangedTypeName(compose_type_id.TypeName + "_Composition"),
+				ID:        *compose_type_id.NewWithAppendTypeName("Composition"),
 				Reference: compose_type_id,
 			},
 			Inline: false,
