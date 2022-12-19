@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mariotoffia/go-openapi/generator/gentypes"
@@ -152,7 +151,7 @@ func CreateComponentFromReference(
 		return nil, nil
 	}
 
-	if ref.Ref == "" {
+	if IsDefinition(ref) {
 		return CreateComponentFromDefinition(
 			ctx, componentId, ref.Value,
 		)
@@ -213,87 +212,4 @@ func CreateComponentFromDefinition(
 	// TODO: Chase down anyOf, oneOf
 
 	return component, nil
-}
-
-// ContainsString will check if a string is in a slice of strings.
-func ContainsString(slice []string, value string) bool {
-	for _, item := range slice {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
-
-// RemoveSchemaRef will remove a _ref_ from the _references_ slice if found.
-func RemoveSchemaRef(references openapi3.SchemaRefs, ref *openapi3.SchemaRef) openapi3.SchemaRefs {
-	for j := range references {
-		if references[j] == ref {
-			return append(references[:j], references[j+1:]...)
-		}
-	}
-
-	return references
-}
-
-// ResolveReferenceAndSwitchIfNeeded will create a `ComponentReference`. If the _ref_ is under the specification root path
-// then it will be used. If it is under model root path it will use that instead to create the `ComponentReference`
-// as root path. If specification and module is on the same root path, the the longest path will be used as root path.
-func ResolveReferenceAndSwitchIfNeeded(
-	ctx *GeneratorContext,
-	componentId *gentypes.ComponentReference,
-	ref *openapi3.SchemaRef,
-) *gentypes.ComponentReference {
-	// Create the fully qualified path to the reference
-	ref_path := filepath.Join(componentId.RootPath, componentId.Path, ref.Ref)
-	ref_path = filepath.Clean(ref_path)
-
-	var type_ref *gentypes.ComponentReference
-
-	if IsSpecificationRooted(ctx, ref_path) {
-		if IsSpecificationRef(ctx, componentId) {
-			// Specification rooted component id -> no switch
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec_root)
-		} else {
-			// Switch root to module root
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
-		}
-	} else {
-		if !IsSpecificationRef(ctx, componentId) {
-			// Module rooted component id -> no switch
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.model_root)
-		} else {
-			// Switch root to spec root
-			type_ref = gentypes.FromSchemaRef(ref, ctx.settings.spec_root)
-		}
-	}
-
-	return type_ref
-}
-
-func ResolveGoPackage(ctx *GeneratorContext, ref *gentypes.ComponentReference) string {
-
-	if IsSpecificationRef(ctx, ref) {
-		return ref.ToGoPackage(ctx.settings.spec_package)
-	}
-
-	return ref.ToGoPackage(ctx.settings.model_package)
-}
-
-func IsSpecificationRef(ctx *GeneratorContext, ref *gentypes.ComponentReference) bool {
-	return IsSpecificationRooted(ctx, ref.RootPath)
-}
-
-func IsSpecificationRooted(ctx *GeneratorContext, path string) bool {
-
-	if strings.HasPrefix(path, ctx.settings.model_root) {
-		if strings.HasPrefix(path, ctx.settings.spec_root) {
-			// Both are rooted - if longest is spec then it is spec rooted
-			return len(ctx.settings.spec_root) > len(ctx.settings.model_root)
-		}
-
-		return false
-	}
-
-	return strings.HasPrefix(path, ctx.settings.spec_root)
 }

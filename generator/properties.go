@@ -125,17 +125,21 @@ func HandleProperties(
 		}
 
 		// No object, this is a definition of a primitive type
-		ref, err := CreateComponentFromDefinition(ctx, property_id, property.Value)
+		property_definition, err := CreateComponentFromDefinition(ctx, property_id, property.Value)
 		if err != nil {
 			return err
 		}
 
 		td.Properties = append(td.Properties, gentypes.Property{
-			ComponentDefinition: *ref, // TODO: This should be a new component with a ref instead?
+			ComponentDefinition: *property_definition,
 			Required:            ContainsString(def.Required, propertyName),
 			PropertyName:        propertyName,
 		})
 	}
 
 	return nil
+}
+
+func HandleArray() {
+	// TODO: Extract array handling from properties.
 }
