@@ -1,4 +1,4 @@
-package generator_test
+package generatortest
 
 import (
 	"encoding/json"

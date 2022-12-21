@@ -13,6 +13,11 @@ func IsDefinition(ref *openapi3.SchemaRef) bool {
 	return ref.Ref == ""
 }
 
+// IsReference check if the _ref_ is a reference or a definition.
+func IsReference(ref *openapi3.SchemaRef) bool {
+	return ref.Ref != ""
+}
+
 // ResolveReferenceAndSwitchIfNeeded will create a `ComponentReference`. If the _ref_ is under the specification root path
 // then it will be used. If it is under model root path it will use that instead to create the `ComponentReference`
 // as root path. If specification and module is on the same root path, the the longest path will be used as root path.

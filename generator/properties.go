@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"fmt"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mariotoffia/go-openapi/generator/gentypes"
 )
@@ -91,55 +93,21 @@ func HandleProperties(
 
 		// Array
 		property_array_id := property_id.NewWithAppendTypeName("Array")
-
-		// Array is ref
-		if property.Value.Items.Ref != "" {
-			ref, err := CreateComponentFromReference(ctx, property_array_id, property.Value.Items)
-			if err != nil {
-				return err
-			}
-
-			td.Properties = append(td.Properties, gentypes.Property{
-				ComponentDefinition: *ref,
-				Required:            ContainsString(def.Required, propertyName),
-				PropertyName:        propertyName,
-			})
-
-			continue
+		if ctx.resolver.ResolveComponent(property_array_id) != nil {
+			return fmt.Errorf("array already defined: %s", property_array_id)
 		}
 
-		// The array is a array of object -> create as reference
-		if property.Value.Type == "object" {
-			ref, err := CreateComponentFromReference(ctx, property_array_id, property.Value.Items)
-			if err != nil {
-				return err
-			}
-
-			td.Properties = append(td.Properties, gentypes.Property{
-				ComponentDefinition: *ref,
-				Required:            ContainsString(def.Required, propertyName),
-				PropertyName:        propertyName,
-			})
-
-			continue
-		}
-
-		// No object, this is a definition of a primitive type
-		property_definition, err := CreateComponentFromDefinition(ctx, property_id, property.Value)
+		ref, err := HandleArray(ctx, property_array_id, property.Value.Items)
 		if err != nil {
 			return err
 		}
 
 		td.Properties = append(td.Properties, gentypes.Property{
-			ComponentDefinition: *property_definition,
+			ComponentDefinition: *ref,
 			Required:            ContainsString(def.Required, propertyName),
 			PropertyName:        propertyName,
 		})
 	}
 
 	return nil
-}
-
-func HandleArray() {
-	// TODO: Extract array handling from properties.
 }

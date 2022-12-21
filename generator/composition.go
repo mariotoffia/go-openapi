@@ -52,11 +52,11 @@ func HandleComposition(
 
 	// Handle all references (all inline objects have been removed)
 	for i := range def.AllOf {
-		compose_type := def.AllOf[i]
-		compose_type_id := ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, compose_type)
-		// Reference to other type.
+		compose_type_id := ResolveReferenceAndSwitchIfNeeded(ctx, &component.ID, def.AllOf[i])
+
 		if ctx.resolver.ResolveComponent(compose_type_id) == nil {
-			if _, err = CreateComponentFromReference(ctx, compose_type_id, compose_type); err != nil {
+			// Ensure reference is created.
+			if _, err = CreateComponentFromReference(ctx, compose_type_id, def.AllOf[i]); err != nil {
 				return err
 			}
 		}
