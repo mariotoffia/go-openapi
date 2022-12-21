@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"fmt"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mariotoffia/go-openapi/generator/gentypes"
 )
@@ -21,76 +23,56 @@ func HandleDiscriminatorBasedPolymorphism(
 		return nil
 	}
 
-	// Extract *all* inline objects first
-	var err error
+	if len(td.Schema.Properties) > 0 {
+		return fmt.Errorf("discriminator not supported on object with properties (component: %s)", componentId)
+	}
 
-	for {
+	if len(td.Schema.AllOf) > 0 {
+		return fmt.Errorf("discriminator not supported on object with allOf (component: %s)", componentId)
+	}
 
-		inline_objects := openapi3.SchemaRefs{}
+	if len(td.Schema.AnyOf) > 0 {
+		return fmt.Errorf("discriminator not supported on object with anyOf (component: %s)", componentId)
+	}
 
-		for i := range def.OneOf {
-			compose_type := def.OneOf[i]
+	for i := range def.OneOf {
+		compose_type := def.OneOf[i]
 
-			if IsDefinition(compose_type) {
-				inline_objects = append(inline_objects, compose_type)
-				continue
-			}
-		}
-
-		if len(inline_objects) == 0 {
-			break
-		}
-
-		// Remove all inline objects in td.Schema.OneOf
-		for i := range inline_objects {
-			td.Schema.OneOf = RemoveSchemaRef(td.Schema.OneOf, inline_objects[i])
-		}
-
-		// Merge the inline objects into the main schema.
-		for i := range inline_objects {
-			c := inline_objects[i]
-			if td.Schema, err = MergeSchemaObjects(ctx, td.Schema, c.Value); err != nil {
-				return err
-			}
+		if IsDefinition(compose_type) {
+			return fmt.Errorf("discriminator object with inline object not supported (component: %s)", componentId)
 		}
 	}
 
 	mapping_table := CreateMappingTable(ctx, componentId, def)
 
-	// Add itself as a discriminator component
-	if len(def.Properties) > 0 {
+	get_map_from := func(ref *gentypes.ComponentReference) string {
+		for from, map_ref := range mapping_table {
+			if ref.Equal(&map_ref) {
+				return from
+			}
+		}
 
-		td.DiscriminatorComponents = append(td.DiscriminatorComponents, gentypes.DiscriminatorComponent{
-			ComponentDefinition: gentypes.ComponentDefinition{
-				ID:        *componentId.NewWithAppendTypeName("Polymorphic"),
-				Reference: componentId,
-			},
-			Discriminator: td.Schema.Discriminator.PropertyName,
-			MapFrom:       "TODO: MapFrom",
-		})
+		return ""
 	}
 
-	// Handle all references (all inline objects have been removed)
 	for i := range def.OneOf {
 		ref := ResolveReferenceAndSwitchIfNeeded(ctx, componentId, def.OneOf[i])
 		// Make sure the the _ref_ is created
 		if ctx.resolver.ResolveComponent(ref) == nil {
-			if _, err = CreateComponentFromReference(ctx, ref, def.OneOf[i]); err != nil {
+			if _, err := CreateComponentFromReference(ctx, ref, def.OneOf[i]); err != nil {
 				return err
 			}
 		}
 
 		td.DiscriminatorComponents = append(td.DiscriminatorComponents, gentypes.DiscriminatorComponent{
 			ComponentDefinition: gentypes.ComponentDefinition{
-				ID:        *ref.NewWithAppendTypeName("Polymorphic"),
+				ID:        *ref,
 				Reference: ref,
 			},
 			Discriminator: td.Schema.Discriminator.PropertyName,
-			MapFrom:       "TODO: MapFrom",
+			MapFrom:       get_map_from(ref),
 		})
 	}
-
-	// TODO: If inline (type=object && len(properties) > 0...) add discriminator to self.
 
 	return nil
 }
@@ -126,7 +108,7 @@ func CreateMappingTable(
 
 	finder := func(ref *gentypes.ComponentReference) bool {
 		for _, map_ref := range mapping {
-			if map_ref.Equal(ref) {
+			if ref.Equal(&map_ref) {
 				return true
 			}
 		}
