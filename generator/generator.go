@@ -199,6 +199,11 @@ func CreateComponentFromDefinition(
 	// Register the component so it will be resolved if cyclic references
 	ctx.resolver.RegisterComponent(component)
 
+	// Polymorphism
+	if err := HandleDiscriminatorBasedPolymorphism(ctx, &td, componentId, td.Schema); err != nil {
+		return nil, err
+	}
+
 	// Composition
 	if err := HandleComposition(ctx, &td, component, def); err != nil {
 		return nil, err
