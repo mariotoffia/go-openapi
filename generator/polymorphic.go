@@ -9,6 +9,10 @@ import (
 
 // HandleDiscriminatorBasedPolymorphism will handle when a discriminator and mapping
 // is provided to determine what type to use. The is the _oneOf_ schema element.
+//
+// CAUTION: It will not support polymorphism with properties, allOf or anyOf. Also
+// when inline type it will also fail - just externalize in same file and it will be
+// ok.
 func HandleDiscriminatorBasedPolymorphism(
 	ctx *GeneratorContext,
 	td *gentypes.TypeDefinition,
